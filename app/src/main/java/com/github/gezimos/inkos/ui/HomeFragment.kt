@@ -1714,7 +1714,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         val ctx = requireContext()
 
         // 1) If permission is missing, go straight to the usage access settings
-        if (!ctx.appUsagePermissionGranted()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasUsageAccessPermission()) {
             try {
                 startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             } catch (e: Exception) {
@@ -1725,7 +1725,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
         val pm = ctx.packageManager
 
-        // 2) Try the official Digital Wellbeing app (Pixels / stock Google)
+        // 2) Try the official Digital Wellbeing app
         try {
             val wellbeingIntent = pm.getLaunchIntentForPackage("com.google.android.apps.wellbeing")
             if (wellbeingIntent != null) {
@@ -1734,12 +1734,10 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                 return
             }
         } catch (_: Exception) {
-            // Ignore and fall through to other options
         }
 
-        // 3) Try common Settings activities that OEMs use for Digital Wellbeing
+        // 3) Try common Settings activities used by OEMs
         val candidates = listOf(
-            // AOSP / many OEMs
             ComponentName(
                 "com.android.settings",
                 "com.android.settings.Settings\$DigitalWellbeingDashboardActivity"
@@ -1761,11 +1759,10 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                     return
                 }
             } catch (_: Exception) {
-                // Try next candidate
             }
         }
 
-        // 4) Final fallback – at least land *somewhere* relevant
+        // 4) Final fallback – usage access or generic settings
         try {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         } catch (_: Exception) {
@@ -1776,6 +1773,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             }
         }
     }
+
 
     // ...existing code...
 
