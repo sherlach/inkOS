@@ -30,7 +30,7 @@ import com.github.gezimos.inkos.helper.launchSyntheticOrSystemApp
 import com.github.gezimos.inkos.helper.setDefaultHomeScreen
 import com.github.gezimos.inkos.helper.utils.BiometricHelper
 import com.github.gezimos.inkos.services.NotificationManager
-import com.github.gezimos.inkos.helper.usageStats.EventLogWrapper
+import com.github.gezimos.inkos.helper.usagestats.EventLogWrapper
 import java.util.Calendar
 
 import kotlinx.coroutines.launch
