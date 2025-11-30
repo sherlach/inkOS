@@ -30,6 +30,9 @@ import com.github.gezimos.inkos.helper.launchSyntheticOrSystemApp
 import com.github.gezimos.inkos.helper.setDefaultHomeScreen
 import com.github.gezimos.inkos.helper.utils.BiometricHelper
 import com.github.gezimos.inkos.services.NotificationManager
+import com.github.gezimos.inkos.helper.usagestats.EventLogWrapper
+import java.util.Calendar
+
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -74,6 +77,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showAudioWidget = MutableLiveData(prefs.showAudioWidgetEnabled)
     val homeBackgroundImageOpacity = MutableLiveData(prefs.homeBackgroundImageOpacity)
     val homeBackgroundImageUri = MutableLiveData(prefs.homeBackgroundImageUri)
+
+    // --- Screen time / Digital Wellbeing ---
+    val screenTimeValue = MutableLiveData<String>()
+
+    private val eventLogWrapper by lazy { EventLogWrapper(appContext) }
+    private var screenTimeLastUpdated: Long = 0L
+
 
     // --- Home screen UI state ---
     private val _homeAppsUiState = MutableLiveData<List<HomeAppUiState>>()
@@ -468,4 +478,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         getAppList(includeHiddenApps = (flag == AppDrawerFlag.HiddenApps), flag = flag)
         getHiddenApps()
     }
+
+    // Has at least [minutes] minutes passed since [since]?
+    private fun hasBeenMinutes(since: Long, minutes: Int): Boolean {
+        if (since == 0L) return true
+        val diff = System.currentTimeMillis() - since
+        return diff >= minutes * 60_000L
+    }
+
+    // Format millis as "0m", "12m", "1h 23m"
+    private fun formatScreenTime(totalMillis: Long): String {
+        if (totalMillis <= 0L) return "0m"
+        val totalSeconds = totalMillis / 1000
+        val minutes = totalSeconds / 60
+        val hours = minutes / 60
+        val remainingMinutes = minutes % 60
+
+        return when {
+            hours > 0 -> "${hours}h ${remainingMinutes}m"
+            minutes > 0 -> "${minutes}m"
+            else -> "<1m"
+        }
+    }
+
+    /**
+     * Compute today's total foreground time and update [screenTimeValue].
+     * Safe to call frequently; it only recomputes once per minute.
+     */
+    fun getTodaysScreenTime() {
+        if (!hasBeenMinutes(screenTimeLastUpdated, 1)) return
+
+        // Start of today (local)
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startTime = calendar.timeInMillis
+        val endTime = System.currentTimeMillis()
+
+        val totalTimeMillis = eventLogWrapper.aggregateSimpleUsageStats(
+            eventLogWrapper.aggregateForegroundStats(
+                eventLogWrapper.getForegroundStatsByTimestamps(startTime, endTime)
+            )
+        )
+
+        val formatted = formatScreenTime(totalTimeMillis)
+        screenTimeValue.postValue(formatted)
+        screenTimeLastUpdated = endTime
+    }
+
 }

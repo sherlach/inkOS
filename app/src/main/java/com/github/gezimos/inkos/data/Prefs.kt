@@ -335,7 +335,7 @@ class Prefs(val context: Context) {
         set(value) {
             val oldValue = prefs.getString(HOME_BACKGROUND_IMAGE_URI, null)
             prefs.edit { putString(HOME_BACKGROUND_IMAGE_URI, value) }
-            
+
             // Clear cache when URI changes or is cleared
             if (oldValue != value) {
                 try {
@@ -583,6 +583,12 @@ class Prefs(val context: Context) {
     var showClock: Boolean
         get() = prefs.getBoolean(SHOW_CLOCK, false)
         set(value) = prefs.edit { putBoolean(SHOW_CLOCK, value) }
+
+    var showScreenTimeWidget: Boolean
+        get() = sharedPrefs.getBoolean("SHOW_SCREEN_TIME_WIDGET", false)
+        set(value) {
+            sharedPrefs.edit().putBoolean("SHOW_SCREEN_TIME_WIDGET", value).apply()
+        }
 
     var showAudioWidgetEnabled: Boolean
         get() = prefs.getBoolean(SHOW_AUDIO_WIDGET_ENABLE, false)

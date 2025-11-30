@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -142,7 +146,7 @@ class SettingsFragment : Fragment() {
                             },
                             titleFontSize = if (settingsSize > 0) (settingsSize * 1.5).sp else TextUnit.Unspecified
                         )
-                        
+
                         // (No bottomInsetDp here)
                     }
                 }
@@ -302,6 +306,20 @@ class SettingsFragment : Fragment() {
                 },
             )
             DashedSeparator()
+
+            // --- Screen time widget toggle ---
+            var showScreenTime by remember { mutableStateOf(prefs.showScreenTimeWidget) }
+
+            SettingsHomeItem(
+                title = "Screen time widget: " + if (showScreenTime) "On" else "Off",
+                titleFontSize = titleFontSize,
+                onClick = {
+                    showScreenTime = !showScreenTime
+                    prefs.showScreenTimeWidget = showScreenTime
+                },
+            )
+            DashedSeparator()
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

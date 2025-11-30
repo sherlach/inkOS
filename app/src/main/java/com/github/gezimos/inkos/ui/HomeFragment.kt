@@ -2,6 +2,7 @@ package com.github.gezimos.inkos.ui
 
 import android.annotation.SuppressLint
 import android.app.admin.DevicePolicyManager
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Context.VIBRATOR_SERVICE
 import android.content.Intent
@@ -12,6 +13,7 @@ import android.graphics.PorterDuffColorFilter
 import android.os.Build
 import android.os.Bundle
 import android.os.Vibrator
+import android.provider.Settings
 import android.text.format.DateFormat
 import android.util.Log
 import android.view.Gravity
@@ -163,6 +165,9 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         // Initialize date display
         updateDateDisplay()
 
+        // Setup Digital Wellbeing / screen time widget
+        setupScreenTimeWidget()
+
         // Observe home app UI state and update UI accordingly
         viewModel.homeAppsUiState.observe(viewLifecycleOwner) { homeAppsUiState ->
             updateHomeAppsUi(homeAppsUiState)
@@ -289,6 +294,73 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             }
         }
     }
+
+    // Screen time code
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun hasUsageAccessPermission(): Boolean {
+        val context = requireContext()
+        val appOpsManager = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        val mode = appOpsManager.unsafeCheckOpNoThrow(
+            "android:get_usage_stats",
+            android.os.Process.myUid(),
+            context.packageName
+        )
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    private fun openDigitalWellbeingOrUsageSettings() {
+        val context = requireContext()
+
+        // Try Google Digital Wellbeing
+        try {
+            val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.wellbeing")
+            if (intent != null) {
+                startActivity(intent)
+                return
+            }
+        } catch (_: Exception) {
+        }
+
+        // Fallback: usage access settings
+        try {
+            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+        } catch (_: Exception) {
+            context.showShortToast(getString(R.string.edit_gestures_settings_toast))
+        }
+    }
+
+    private fun setupScreenTimeWidget() {
+        // If user has disabled the widget, hide and bail
+        if (!prefs.showScreenTimeWidget) {
+            binding.tvScreenTime.visibility = View.GONE
+            return
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            binding.tvScreenTime.visibility = View.GONE
+            return
+        }
+
+        if (!hasUsageAccessPermission()) {
+            binding.tvScreenTime.visibility = View.GONE
+            return
+        }
+
+        binding.tvScreenTime.visibility = View.VISIBLE
+
+        viewModel.screenTimeValue.observe(viewLifecycleOwner) { value ->
+            binding.tvScreenTime.text = value
+        }
+
+        viewModel.getTodaysScreenTime()
+
+        binding.tvScreenTime.setOnClickListener {
+            openDigitalWellbeingOrUsageSettings()
+            CrashHandler.logUserAction("Screen time clicked")
+        }
+    }
+
 
     // ...existing code...
 
@@ -452,7 +524,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
         // Refresh home app UI state on resume
         viewModel.refreshHomeAppsUiState(requireContext())
-        
+
         // Re-validate background image URI in case permissions were restored
         BackgroundImageHelper.validateBackgroundImageUri(requireContext(), prefs)
 
@@ -657,10 +729,10 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                 layoutParams.topMargin = (prefs.topWidgetMargin * density).toInt()
                 clock.layoutParams = layoutParams
             }
-            
+
             // Set bottom margin of bottom widgets wrapper
             applyBottomWidgetMargin()
-            
+
             // Battery widget setup removed
             binding.quote.textSize = prefs.quoteSize.toFloat()
             binding.quote.visibility = if (prefs.showQuote) View.VISIBLE else View.GONE
@@ -781,7 +853,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
     override fun onLongClick(view: View): Boolean {
         vibratePaging()
-        
+
         if (prefs.homeLocked) {
             if (prefs.longPressAppInfoEnabled) {
                 // Open app info for the long-pressed app
@@ -882,7 +954,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             clock.setOnClickListener(this@HomeFragment)
             quote.setOnClickListener(this@HomeFragment)
         }
-        
+
         // Set up date click listener (date view is found dynamically as it's not in binding)
         cachedDateView?.setOnClickListener(this@HomeFragment)
     }
@@ -1041,14 +1113,14 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             val notificationManager = NotificationManager.getInstance(requireContext())
             val notifications = notificationManager.notificationInfoLiveData.value ?: emptyMap()
             val notificationInfo = notifications[packageName]
-            
+
             // Fixed: Clear badge notification when app is opened (except for media that should persist while playing)
             // User interaction with the app means they've seen the notification content
             val isMediaPlayback = notificationInfo?.category == android.app.Notification.CATEGORY_TRANSPORT
             if (!isMediaPlayback) {
                 // Clear the badge when opening the app - user has seen/interacted with the app
                 notificationManager.updateBadgeNotification(packageName, null)
-                
+
                 // Optionally clear conversation notifications if user preference is enabled
                 if (prefs.clearConversationOnAppOpen) {
                     // Clear all conversation notifications for this package
@@ -1058,7 +1130,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                     }
                 }
             }
-            
+
             viewModel.launchApp(homeApp, this)
         }
     }
@@ -1592,25 +1664,25 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         val showDate = prefs.showDate
         val clockView = cachedClockView
         val dateView = cachedDateView
-        
+
         // Redundant safeguard: ensure date click listener is set even if view is recreated
         dateView?.setOnClickListener(this@HomeFragment)
-        
+
         // Update bottom widget margin for bottom widgets wrapper
         applyBottomWidgetMargin()
-        
+
         // Set visibility states
         setViewsVisibility(
             clockView to if (showClock) View.VISIBLE else View.GONE,
             dateView to if (showDate) View.VISIBLE else View.GONE
         )
-        
+
         // Configure date view if visible
         if (showDate) {
             configureDateView(dateView)
             triggerBatteryUpdate()
         }
-        
+
         // Set top margins based on what's visible
         when {
             showClock && showDate -> {
@@ -1621,14 +1693,14 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             showDate -> setTopMargin(dateView, prefs.topWidgetMargin)
         }
     }
-    
+
     // Helper functions for date display optimization
     private fun setViewsVisibility(vararg views: Pair<TextView?, Int>) {
         views.forEach { (view, visibility) ->
             view?.visibility = visibility
         }
     }
-    
+
     private fun configureDateView(dateView: TextView?) {
         dateView?.apply {
             textSize = prefs.dateSize.toFloat()
@@ -1636,7 +1708,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             this.typeface = typeface
         }
     }
-    
+
     private fun setTopMargin(view: TextView?, marginDp: Int) {
         view?.let {
             val layoutParams = it.layoutParams as? LinearLayout.LayoutParams
@@ -1647,7 +1719,7 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             }
         }
     }
-    
+
     private fun triggerBatteryUpdate() {
         val batteryIntent = requireContext().registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         batteryIntent?.let { batteryReceiver.onReceive(requireContext(), it) }

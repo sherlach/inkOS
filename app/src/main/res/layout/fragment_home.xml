@@ -59,6 +59,21 @@
                         android:textSize="@dimen/alarm_size"
                         android:visibility="gone"
                         tools:text="Thu, 30 Dec" />
+
+                    <TextView
+                        android:id="@+id/tvScreenTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0m"
+                        android:textSize="14sp"
+                        android:padding="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        android:layout_marginStart="12dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_gravity="top|start" />
+
                 </LinearLayout>
 
 
