@@ -136,7 +136,7 @@
     <string name="clock_click_app">Click on Clock</string>
     <string name="date_click_app">Click on Date</string>
     <string name="quote_click_app">Click on Quote</string>
-    
+
     <string name="edit_gestures_settings_toast">Edit actions &amp; Gestures in Settings/Gestures</string>
 
     <string name="swipe_movement">Swipe Movement</string>
@@ -259,6 +259,7 @@
     <!-- Permissions Strings -->
     <string name="bluetooth_permission_required_title">BLUETOOTH PERMISSION REQUIRED:</string>
     <string name="bluetooth_permission_required_body">This particular tool is only useful for Mudita Kompakt or other phones that do not have Bluetooth History. Missing permissions: %1$s. Please grant permissions to use Bluetooth features.</string>
+    <string name="screen_time_tap_to_enable">Screen time: tap to enable access</string>
 
     <!-- Private Spaces Strings -->
     <string name="alert_requires_android_v">This functionality requires Android 15 or later.</string>

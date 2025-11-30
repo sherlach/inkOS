@@ -331,28 +331,39 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     }
 
     private fun setupScreenTimeWidget() {
-        // If user has disabled the widget, hide and bail
+        // Respect user setting
         if (!prefs.showScreenTimeWidget) {
             binding.tvScreenTime.visibility = View.GONE
             return
         }
 
+        // Only supported on Android Q+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             binding.tvScreenTime.visibility = View.GONE
             return
         }
 
+        // We want *something* visible once the user has turned it on
+        binding.tvScreenTime.visibility = View.VISIBLE
+
+        // Case 1: permission NOT granted yet → show hint and send user to settings
         if (!hasUsageAccessPermission()) {
-            binding.tvScreenTime.visibility = View.GONE
+            binding.tvScreenTime.text = getString(R.string.screen_time_tap_to_enable)
+
+            binding.tvScreenTime.setOnClickListener {
+                // Open Digital Wellbeing if present, otherwise Usage Access settings
+                openDigitalWellbeingOrUsageSettings()
+                CrashHandler.logUserAction("Screen time permission prompt clicked")
+            }
             return
         }
 
-        binding.tvScreenTime.visibility = View.VISIBLE
-
+        // Case 2: permission granted → show real screen time and open DW/settings on tap
         viewModel.screenTimeValue.observe(viewLifecycleOwner) { value ->
             binding.tvScreenTime.text = value
         }
 
+        // Initial compute
         viewModel.getTodaysScreenTime()
 
         binding.tvScreenTime.setOnClickListener {
@@ -360,7 +371,6 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             CrashHandler.logUserAction("Screen time clicked")
         }
     }
-
 
     // ...existing code...
 
