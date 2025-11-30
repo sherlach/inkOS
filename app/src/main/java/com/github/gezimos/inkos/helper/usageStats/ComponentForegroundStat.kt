@@ -1,4 +1,4 @@
-package app.olauncher.helper.usageStats
+package com.github.gezimos.inkos.helper.usageStats
 
 import java.util.Date
 
