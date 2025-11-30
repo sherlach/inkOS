@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Context.VIBRATOR_SERVICE
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ComponentName
 import android.graphics.ColorFilter
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
@@ -23,6 +24,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -167,6 +169,17 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
         // Setup Digital Wellbeing / screen time widget
         setupScreenTimeWidget()
+
+        // If your feature flag / pref says the widget is enabled:
+        if (prefs.showScreenTimeWidget) {          // or whatever boolean you used
+            binding.tvScreenTime.visibility = View.VISIBLE
+            positionScreenTimeTopLeft()
+        } else {
+            binding.tvScreenTime.visibility = View.GONE
+        }
+
+        // Also make sure click goes through HomeFragment.onClick:
+        binding.tvScreenTime.setOnClickListener(this)
 
         // Observe home app UI state and update UI accordingly
         viewModel.homeAppsUiState.observe(viewLifecycleOwner) { homeAppsUiState ->
@@ -371,6 +384,40 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             CrashHandler.logUserAction("Screen time clicked")
         }
     }
+
+    private fun positionScreenTimeTopLeft() {
+        val tv = binding.tvScreenTime
+        val parent = tv.parent as? ViewGroup ?: return
+
+        // Base layout params that work for most ViewGroup types
+        val baseLp = (tv.layoutParams as? ViewGroup.MarginLayoutParams)
+            ?: ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+        // Some dp → px helpers without needing extensions
+        val density = resources.displayMetrics.density
+        val topMarginPx = (16 * density).toInt()
+        val sideMarginPx = (16 * density).toInt()
+
+        baseLp.topMargin = topMarginPx
+        baseLp.marginStart = sideMarginPx
+        baseLp.leftMargin = sideMarginPx
+
+        // If the parent is a FrameLayout (or subclass), we can also use gravity
+        val lp = if (parent is FrameLayout) {
+            FrameLayout.LayoutParams(baseLp).apply {
+                gravity = Gravity.TOP or Gravity.START
+            }
+        } else {
+            // For LinearLayout / ConstraintLayout etc we at least push it with margins
+            baseLp
+        }
+
+        tv.layoutParams = lp
+    }
+
 
     // ...existing code...
 
@@ -841,6 +888,10 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             }
 
             // Battery widget click removed
+
+            R.id.tvScreenTime -> {
+                openScreenTimeDigitalWellbeing()
+            }
 
             else -> {
                 try { // Launch app
@@ -1656,6 +1707,73 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         } catch (e: Exception) {
             // Fail silently; don't crash the home screen if something goes wrong
             e.printStackTrace()
+        }
+    }
+
+    private fun openScreenTimeDigitalWellbeing() {
+        val ctx = requireContext()
+
+        // 1) If permission is missing, go straight to the usage access settings
+        if (!ctx.appUsagePermissionGranted()) {
+            try {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            } catch (e: Exception) {
+                showShortToast(getString(R.string.unable_to_open_digital_wellbeing))
+            }
+            return
+        }
+
+        val pm = ctx.packageManager
+
+        // 2) Try the official Digital Wellbeing app (Pixels / stock Google)
+        try {
+            val wellbeingIntent = pm.getLaunchIntentForPackage("com.google.android.apps.wellbeing")
+            if (wellbeingIntent != null) {
+                wellbeingIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(wellbeingIntent)
+                return
+            }
+        } catch (_: Exception) {
+            // Ignore and fall through to other options
+        }
+
+        // 3) Try common Settings activities that OEMs use for Digital Wellbeing
+        val candidates = listOf(
+            // AOSP / many OEMs
+            ComponentName(
+                "com.android.settings",
+                "com.android.settings.Settings\$DigitalWellbeingDashboardActivity"
+            ),
+            ComponentName(
+                "com.android.settings",
+                "com.android.settings.Settings\$WellbeingSettingsActivity"
+            )
+        )
+
+        for (cn in candidates) {
+            try {
+                val intent = Intent().apply {
+                    component = cn
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (intent.resolveActivity(pm) != null) {
+                    startActivity(intent)
+                    return
+                }
+            } catch (_: Exception) {
+                // Try next candidate
+            }
+        }
+
+        // 4) Final fallback – at least land *somewhere* relevant
+        try {
+            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+            } catch (_: Exception) {
+                showShortToast(getString(R.string.unable_to_open_digital_wellbeing))
+            }
         }
     }
 
