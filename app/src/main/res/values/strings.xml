@@ -260,6 +260,7 @@
     <string name="bluetooth_permission_required_title">BLUETOOTH PERMISSION REQUIRED:</string>
     <string name="bluetooth_permission_required_body">This particular tool is only useful for Mudita Kompakt or other phones that do not have Bluetooth History. Missing permissions: %1$s. Please grant permissions to use Bluetooth features.</string>
     <string name="screen_time_tap_to_enable">Screen time: tap to enable access</string>
+    <string name="unable_to_open_digital_wellbeing">Unable to open Digital Wellbeing</string>
 
     <!-- Private Spaces Strings -->
     <string name="alert_requires_android_v">This functionality requires Android 15 or later.</string>
